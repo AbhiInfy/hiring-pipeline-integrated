@@ -35,6 +35,12 @@ def main() -> None:
         shortlist_df = pd.DataFrame()
     summary = _load_summary(summary_file)
 
+    requested_jd_mode = str(summary.get("requested_jd_mode", "")).strip()
+    used_jd_mode = str(summary.get("used_jd_mode", "")).strip()
+    requested_matching_mode = str(summary.get("requested_matching_mode", "")).strip()
+    used_matching_mode = str(summary.get("used_matching_mode", "")).strip()
+    warnings = summary.get("warnings", []) if isinstance(summary.get("warnings", []), list) else []
+
     total_jobs = int(summary.get("total_jobs", shortlist_df["row_num"].nunique() if not shortlist_df.empty else 0))
     total_candidates = int(summary.get("total_candidates", shortlist_df["candidate_name"].nunique() if not shortlist_df.empty else 0))
     total_matches = int(summary.get("total_matches", len(shortlist_df)))
@@ -49,6 +55,22 @@ def main() -> None:
     col4.metric("Emails Sent", emails_sent)
     col5.metric("Emails Failed", emails_failed)
     col6.metric("Emails Dry Run", emails_dry_run)
+
+    if requested_jd_mode or used_jd_mode or requested_matching_mode or used_matching_mode:
+        st.markdown("### Runtime Modes")
+        st.write(
+            {
+                "requested_jd_mode": requested_jd_mode,
+                "used_jd_mode": used_jd_mode,
+                "requested_matching_mode": requested_matching_mode,
+                "used_matching_mode": used_matching_mode,
+            }
+        )
+
+    if warnings:
+        st.markdown("### Pipeline Warnings")
+        for warning in warnings:
+            st.warning(str(warning))
 
     if shortlist_df.empty:
         st.info("No matches met the configured threshold.")

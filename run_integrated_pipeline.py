@@ -11,7 +11,9 @@ from src.config import build_paths, default_candidate_profiles_file, default_pro
 from src.email.service import EmailDispatchConfig, dispatch_shortlist_emails
 from src.env_loader import load_project_env
 from src.ingest.naukri_scraper import scrape_job_links
-from src.job_generator.jd_service import generate_jd_catalog
+from src.job_generator.jd_service import generate_jd_catalog as generate_jd_catalog_heuristic
+from src.adapters.jd_generator_adapter import generate_jd_catalog as generate_jd_catalog_adapter
+from src.adapters.matching_adapter import match_candidates_to_jd_adapter
 from src.matching.engine import MatchConfig, match_candidates_to_jd
 
 
@@ -29,6 +31,9 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--skip-contact-details", action="store_true")
 
     parser.add_argument("--rows", type=int, default=None)
+    parser.add_argument("--jd-mode", choices=["auto", "heuristic", "adapter"], default="auto")
+    parser.add_argument("--matching-mode", choices=["auto", "jaccard", "adapter"], default="auto")
+    parser.add_argument("--job-generator-dir", default="")
     parser.add_argument("--top-k", type=int, default=5)
     parser.add_argument("--min-score", type=float, default=0.12)
     parser.add_argument("--default-email", default="chaturvedi.abhishek10@gmail.com")
@@ -36,6 +41,119 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--send-emails", action="store_true")
     parser.add_argument("--notification-email", default="")
     return parser
+
+
+def resolve_job_generator_dir(integration_root: Path, configured_dir: str) -> Path:
+    if configured_dir:
+        return Path(configured_dir).resolve()
+    return (integration_root.parent / "project-job-generator").resolve()
+
+
+def build_jd_catalog(job_links_df: pd.DataFrame, args, integration_root: Path) -> tuple[pd.DataFrame, str, str | None]:
+    mode = (args.jd_mode or "auto").strip().lower()
+    job_generator_dir = resolve_job_generator_dir(integration_root, args.job_generator_dir)
+
+    if mode == "heuristic":
+        return generate_jd_catalog_heuristic(job_links_df, max_rows=args.rows), "heuristic", None
+
+    if mode == "adapter":
+        if not job_generator_dir.exists():
+            raise FileNotFoundError(
+                f"project-job-generator directory not found: {job_generator_dir}. "
+                "Pass --job-generator-dir or use --jd-mode heuristic."
+            )
+        return generate_jd_catalog_adapter(job_links_df, job_generator_dir=job_generator_dir, max_rows=args.rows), "adapter", None
+
+    # auto mode: attempt adapter first, fallback to heuristic.
+    if job_generator_dir.exists():
+        try:
+            return generate_jd_catalog_adapter(job_links_df, job_generator_dir=job_generator_dir, max_rows=args.rows), "adapter", None
+        except Exception as exc:
+            warning = f"adapter JD generation failed, falling back to heuristic mode: {exc}"
+            return generate_jd_catalog_heuristic(job_links_df, max_rows=args.rows), "heuristic", warning
+
+    warning = (
+        f"adapter JD generation skipped because project-job-generator was not found at {job_generator_dir}. "
+        "Using heuristic mode."
+    )
+    return generate_jd_catalog_heuristic(job_links_df, max_rows=args.rows), "heuristic", warning
+
+
+def build_matches(
+    jd_catalog_df: pd.DataFrame,
+    candidate_profiles_df: pd.DataFrame,
+    args,
+    integration_root: Path,
+) -> tuple[pd.DataFrame, str, str | None]:
+    mode = (args.matching_mode or "auto").strip().lower()
+    job_generator_dir = resolve_job_generator_dir(integration_root, args.job_generator_dir)
+
+    if mode == "jaccard":
+        return (
+            match_candidates_to_jd(
+                jd_catalog_df,
+                candidate_profiles_df,
+                config=MatchConfig(top_k=args.top_k, min_score=args.min_score),
+            ),
+            "jaccard",
+            None,
+        )
+
+    if mode == "adapter":
+        if not job_generator_dir.exists():
+            raise FileNotFoundError(
+                f"project-job-generator directory not found: {job_generator_dir}. "
+                "Pass --job-generator-dir or use --matching-mode jaccard."
+            )
+        return (
+            match_candidates_to_jd_adapter(
+                jd_catalog_df,
+                job_generator_dir=job_generator_dir,
+                top_k=args.top_k,
+                min_score=args.min_score,
+            ),
+            "adapter",
+            None,
+        )
+
+    # auto mode: attempt adapter first, fallback to jaccard.
+    if job_generator_dir.exists():
+        try:
+            return (
+                match_candidates_to_jd_adapter(
+                    jd_catalog_df,
+                    job_generator_dir=job_generator_dir,
+                    top_k=args.top_k,
+                    min_score=args.min_score,
+                ),
+                "adapter",
+                None,
+            )
+        except Exception as exc:
+            warning = f"adapter matching failed, falling back to jaccard mode: {exc}"
+            return (
+                match_candidates_to_jd(
+                    jd_catalog_df,
+                    candidate_profiles_df,
+                    config=MatchConfig(top_k=args.top_k, min_score=args.min_score),
+                ),
+                "jaccard",
+                warning,
+            )
+
+    warning = (
+        f"adapter matching skipped because project-job-generator was not found at {job_generator_dir}. "
+        "Using jaccard mode."
+    )
+    return (
+        match_candidates_to_jd(
+            jd_catalog_df,
+            candidate_profiles_df,
+            config=MatchConfig(top_k=args.top_k, min_score=args.min_score),
+        ),
+        "jaccard",
+        warning,
+    )
 
 
 def main() -> int:
@@ -59,6 +177,7 @@ def main() -> int:
     output_path = (integration_root / args.output).resolve()
     output_path.parent.mkdir(parents=True, exist_ok=True)
     paths.job_links_file = output_path
+    runtime_warnings: list[str] = []
 
     print("[Stage 1/5] Job Generator (JD Generation)...")
     scrape_job_links(
@@ -69,6 +188,7 @@ def main() -> int:
         max_age_hours=args.max_age_hours,
         delay=args.delay,
         login=args.login,
+        skip_contact_details=args.skip_contact_details,
     )
 
     # Ensure downstream stages always have a recipient email fallback in the exported job file.
@@ -89,14 +209,28 @@ def main() -> int:
 
     print("[Stage 3/5] AI Matching Engine (Similarity Search)...")
     job_links_df = pd.read_excel(output_path)
-    jd_catalog = generate_jd_catalog(job_links_df, max_rows=args.rows)
+    jd_catalog, jd_mode_used, jd_warning = build_jd_catalog(job_links_df, args, integration_root)
     jd_catalog.to_csv(paths.jd_catalog_file, index=False)
+    print(f"JD generation mode used: {jd_mode_used}")
+    if jd_warning:
+        runtime_warnings.append(jd_warning)
+        print(f"WARNING: {jd_warning}")
 
-    matches = match_candidates_to_jd(
-        jd_catalog,
-        candidate_profiles,
-        config=MatchConfig(top_k=args.top_k, min_score=args.min_score),
-    )
+    matching_mode = (args.matching_mode or "auto").strip().lower()
+    if matching_mode in {"auto", "adapter"}:
+        matches, matching_mode_used, matching_warning = build_matches(jd_catalog, candidate_profiles, args, integration_root)
+        if matching_warning:
+            runtime_warnings.append(matching_warning)
+            print(f"WARNING: {matching_warning}")
+    else:
+        matches = match_candidates_to_jd(
+            jd_catalog,
+            candidate_profiles,
+            config=MatchConfig(top_k=args.top_k, min_score=args.min_score),
+        )
+        matching_mode_used = "jaccard"
+
+    print(f"Matching mode used: {matching_mode_used}")
     matches.to_csv(paths.match_results_file, index=False)
 
     print("[Stage 4/5] Email Service (SMTP / SendGrid)...")
@@ -123,6 +257,11 @@ def main() -> int:
         "emails_sent": sent_count,
         "emails_failed": failed_count,
         "emails_dry_run": dry_run_count,
+        "requested_jd_mode": args.jd_mode,
+        "used_jd_mode": jd_mode_used,
+        "requested_matching_mode": args.matching_mode,
+        "used_matching_mode": matching_mode_used,
+        "warnings": runtime_warnings,
         "job_links_file": str(paths.job_links_file),
         "jd_catalog_file": str(paths.jd_catalog_file),
         "candidate_profiles_file": str(paths.candidate_profiles_file),
@@ -138,6 +277,10 @@ def main() -> int:
     print(f"Shortlisted profiles: {paths.match_results_file}")
     print(f"Email dispatch: {paths.email_dispatch_file}")
     print(f"Summary: {paths.summary_file}")
+    if runtime_warnings:
+        print("Fallback warnings:")
+        for warning in runtime_warnings:
+            print(f"- {warning}")
     print("To view dashboard: streamlit run src/dashboard/app.py")
     return 0
 

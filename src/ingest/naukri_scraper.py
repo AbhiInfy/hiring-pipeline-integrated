@@ -14,6 +14,10 @@ from playwright.sync_api import sync_playwright
 BASE_URL = "https://www.naukri.com"
 SHEET_NAME = "Job Links"
 HEADERS = ["Technology", "Job Title", "Company", "Posted", "Email", "Contact Number", "Job Link", "Collected At"]
+EMAIL_PATTERN = re.compile(r"\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b", re.IGNORECASE)
+PHONE_PATTERN = re.compile(
+    r"(?:\+91[\s-]?)?(?:0[\s-]?)?[6-9]\d{2}[\s-]?\d{3}[\s-]?\d{4}\b"
+)
 
 
 def normalize_url(url: str) -> str:
@@ -129,6 +133,25 @@ def search_url(keyword: str, page: int) -> str:
     return f"{BASE_URL}/{query}-jobs-{page}?k={query}"
 
 
+def extract_contact_details(text: str) -> tuple[str, str]:
+    emails = sorted(set(EMAIL_PATTERN.findall(text)))
+    phones = sorted(set(match.group(0).strip() for match in PHONE_PATTERN.finditer(text)))
+    return ", ".join(emails), ", ".join(phones)
+
+
+def fetch_contact_details(browser, link: str) -> tuple[str, str]:
+    detail_page = browser.new_page()
+    try:
+        detail_page.goto(link, wait_until="domcontentloaded", timeout=45000)
+        detail_page.wait_for_timeout(2500)
+        text = detail_page.locator("body").inner_text(timeout=5000)
+        return extract_contact_details(text)
+    except Exception:
+        return "", ""
+    finally:
+        detail_page.close()
+
+
 def extract_jobs(page, max_age_hours: int):
     jobs = []
     cards = page.locator("article, .srp-jobtuple-wrapper, .jobTuple, div:has(a[href*='job-listings'])")
@@ -149,6 +172,7 @@ def extract_jobs(page, max_age_hours: int):
             title = anchor.inner_text(timeout=1000).strip()
             card_text = card.inner_text(timeout=1000)
             lower_text = card_text.lower()
+            email, contact_number = extract_contact_details(card_text)
 
             posted_text = ""
             age_hours = None
@@ -176,8 +200,8 @@ def extract_jobs(page, max_age_hours: int):
                     "title": title,
                     "company": company,
                     "posted": posted_text,
-                    "email": "",
-                    "contact_number": "",
+                    "email": email,
+                    "contact_number": contact_number,
                     "link": link,
                 }
             )
@@ -218,6 +242,22 @@ def wait_for_manual_login(page):
     print("Log in to Naukri manually if you are not already logged in.")
     print("When login is complete, return here and press Enter.")
     input()
+    try:
+        page.wait_for_load_state("networkidle", timeout=15000)
+    except Exception:
+        pass
+
+
+def goto_with_retry(page, url: str, timeout: int = 60000):
+    try:
+        page.goto(url, wait_until="domcontentloaded", timeout=timeout)
+    except Exception as exc:
+        message = str(exc).lower()
+        if "interrupted by another navigation" not in message and "navigation" not in message:
+            raise
+
+        page.wait_for_load_state("networkidle", timeout=15000)
+        page.goto(url, wait_until="domcontentloaded", timeout=timeout)
 
 
 def scrape_job_links(
@@ -229,6 +269,7 @@ def scrape_job_links(
     max_age_hours: int = 24,
     delay: float = 2.0,
     login: bool = False,
+    skip_contact_details: bool = False,
 ) -> dict[str, int]:
     output_path = Path(output_path).resolve()
     profile_dir = Path(profile_dir).resolve()
@@ -256,7 +297,7 @@ def scrape_job_links(
         for page_number in range(1, pages + 1):
             url = search_url(keyword, page_number)
             print(f"Scanning page {page_number}: {url}")
-            page.goto(url, wait_until="domcontentloaded", timeout=60000)
+            goto_with_retry(page, url)
             page.wait_for_timeout(3500)
 
             jobs = extract_jobs(page, max_age_hours)
@@ -266,6 +307,11 @@ def scrape_job_links(
                 normalized = normalize_url(job["link"])
                 if normalized in seen:
                     continue
+
+                if not skip_contact_details and (not job["email"] or not job["contact_number"]):
+                    email, contact_number = fetch_contact_details(browser, job["link"])
+                    job["email"] = job["email"] or email
+                    job["contact_number"] = job["contact_number"] or contact_number
 
                 sheet.append(
                     [

@@ -3,8 +3,8 @@
 End-to-end hiring workflow with five connected stages:
 
 1. Job ingestion from Naukri (Playwright browser automation)
-2. JD catalog generation from collected links
-3. Candidate-to-JD matching (Jaccard score on normalized skill tokens)
+2. JD catalog generation from collected links (adapter or heuristic)
+3. Candidate-to-JD matching (adapter semantic matching or Jaccard fallback)
 4. Email dispatch (dry-run by default, SMTP/SendGrid when enabled)
 5. Recruiter dashboard in Streamlit
 
@@ -66,6 +66,8 @@ Then update .env with your values (especially if you will send emails):
 - PIPELINE_NOTIFICATION_EMAIL
 - DEFAULT_FALLBACK_RECIPIENT
 
+For Gmail SMTP, use a 16-character Google App Password for SENDER_PASSWORD.
+
 ## Candidate Input Format
 
 The pipeline expects candidate profiles in an Excel workbook (.xlsx or .xls).
@@ -104,6 +106,30 @@ Run with custom search and page count:
 python .\run_integrated_pipeline.py --keyword "Oracle Fusion Application" --pages 2 --rows 10
 ```
 
+Run with adapter-backed JD generation (uses project-job-generator when available):
+
+```powershell
+python .\run_integrated_pipeline.py --jd-mode adapter --job-generator-dir ..\project-job-generator
+```
+
+Run with adapter-backed semantic candidate matching:
+
+```powershell
+python .\run_integrated_pipeline.py --matching-mode adapter --job-generator-dir ..\project-job-generator
+```
+
+Run with explicit Jaccard matching:
+
+```powershell
+python .\run_integrated_pipeline.py --matching-mode jaccard
+```
+
+Run with explicit heuristic JD generation:
+
+```powershell
+python .\run_integrated_pipeline.py --jd-mode heuristic
+```
+
 Run with manual Naukri login flow:
 
 ```powershell
@@ -126,6 +152,12 @@ Send real emails via SMTP:
 
 ```powershell
 python .\run_integrated_pipeline.py --send-emails --email-provider smtp --notification-email recruiter@example.com
+```
+
+Example verified send command:
+
+```powershell
+python .\run_integrated_pipeline.py --pages 1 --rows 1 --skip-contact-details --jd-mode auto --matching-mode auto --job-generator-dir ..\project-job-generator --send-emails --email-provider smtp --notification-email recruiter@example.com --keyword "Oracle Fusion Application"
 ```
 
 Send real emails via SendGrid:
@@ -169,7 +201,23 @@ Notes:
 
 - Stage 1 launches Chromium in non-headless mode to scrape Naukri.
 - By default, email stage is dry-run unless --send-emails is provided.
+- In auto mode, adapter components are attempted first and the pipeline falls back to heuristic/jaccard with warnings.
 - Job link output receives fallback email values where link-level email is missing.
+
+## Email Delivery Verification
+
+After each run, verify delivery status from output files:
+
+- output/email_dispatch.csv
+  - status=sent means the email provider accepted the message
+  - status=dry-run means no real send was attempted
+  - status=failed means send attempt failed and message contains error details
+- output/pipeline_summary.json
+  - emails_sent / emails_failed / emails_dry_run counters
+  - requested_* and used_* mode fields for JD and matching
+  - warnings list when auto-mode fallback occurred
+
+If you do not see a message in inbox even when status=sent, check Spam/Promotions and sender-side Sent Mail.
 
 ## CLI Options
 
@@ -183,6 +231,9 @@ Notes:
 --delay                     Delay between page scans (default: 2.0)
 --login                     Pause for manual Naukri login before scraping
 --rows                      Limit rows used for JD generation
+--jd-mode                   auto | heuristic | adapter (default: auto)
+--matching-mode             auto | jaccard | adapter (default: auto)
+--job-generator-dir         Path to project-job-generator for adapter mode
 --top-k                     Max shortlisted candidates per job (default: 5)
 --min-score                 Minimum similarity threshold (default: 0.12)
 --default-email             Fallback email written to job link rows
@@ -195,5 +246,9 @@ Notes:
 
 - ModuleNotFoundError (for example: pandas): install dependencies with pip install -r requirements.txt.
 - Playwright browser missing: run python -m playwright install chromium.
+- Adapter mode not found: pass --job-generator-dir to your project-job-generator path, or use --jd-mode heuristic.
+- Matching adapter issues: use --matching-mode jaccard, or install project-job-generator dependencies in the active environment.
 - No dashboard data: run the pipeline first to generate output/shortlisted_profiles.csv.
 - No email recipient configured: set PIPELINE_NOTIFICATION_EMAIL or DEFAULT_FALLBACK_RECIPIENT, or pass --notification-email.
+- Email not received: first check output/email_dispatch.csv. If status is dry-run, rerun with --send-emails. If status is failed, read message for SMTP/SendGrid error.
+- Gmail SMTP auth errors: ensure SENDER_EMAIL is correct, 2FA is enabled, and SENDER_PASSWORD is a valid App Password.
