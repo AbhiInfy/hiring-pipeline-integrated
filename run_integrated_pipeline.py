@@ -206,6 +206,20 @@ def main() -> int:
 
     print("[Stage 2/5] Candidate Database (Resume Search)...")
     candidate_profiles = load_candidate_profiles(paths.candidate_profiles_file)
+    
+    # Validate candidate data
+    if candidate_profiles.empty:
+        print("\n" + "="*60)
+        print("❌ PIPELINE STOPPED: No Valid Candidate Data")
+        print("="*60)
+        print("The candidate profiles file could not be loaded or contains no valid data.")
+        print(f"File: {paths.candidate_profiles_file}")
+        print("\nPlease ensure your Excel file has:")
+        print("  • Required columns: Candidate Name, Skills, Email ID, Notice Period (Days)")
+        print("  • At least one row with candidate name and skills")
+        print("  • File is not open in another program")
+        print("\nAfter fixing the file, re-run the pipeline.")
+        return 1
 
     print("[Stage 3/5] AI Matching Engine (Similarity Search)...")
     job_links_df = pd.read_excel(output_path)
@@ -231,6 +245,7 @@ def main() -> int:
         matching_mode_used = "jaccard"
 
     print(f"Matching mode used: {matching_mode_used}")
+    print(f"Total matches found: {len(matches)}")
     matches.to_csv(paths.match_results_file, index=False)
 
     print("[Stage 4/5] Email Service (SMTP / SendGrid)...")

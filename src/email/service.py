@@ -25,12 +25,46 @@ class EmailDispatchConfig:
 
 
 def _clean(value: str) -> str:
-    return (value or "").strip()
+    """Clean and normalize string values"""
+    if pd.isna(value):
+        return ""
+    text = str(value).strip()
+    if text.lower() in {"", "nan", "nat", "none", "null", "n/a", "na"}:
+        return ""
+    return text
+
+
+def _clean_company_name(company: str) -> str:
+    """
+    Clean company name, handle missing, NaN, and invalid values.
+    Returns a proper company name or default "Client" value.
+    """
+    # Handle None, NaN, or empty values
+    if company is None or pd.isna(company):
+        return "Client"
+    
+    # Convert to string and clean
+    cleaned = str(company).strip()
+    
+    # Check for common invalid values
+    invalid_values = {"", "nan", "NaN", "None", "null", "N/A", "n/a", "na", "-", "unknown", "not specified"}
+    if cleaned.lower() in invalid_values or not cleaned:
+        return "Client"
+    
+    # Remove any remaining NaN references
+    cleaned = cleaned.replace("nan", "").replace("NaN", "").replace("None", "").strip()
+    
+    # If after cleaning it's empty, return default
+    if not cleaned:
+        return "Client"
+    
+    return cleaned
 
 
 def _build_subject(role: str, company: str) -> str:
+    """Build email subject with proper handling of missing values"""
     role_clean = _clean(role) or "Open Role"
-    company_clean = _clean(company) or "Client"
+    company_clean = _clean_company_name(company)
     return f"Shortlist Update: {role_clean} - {company_clean}"
 
 
@@ -58,6 +92,7 @@ def _load_email_template() -> str:
 
 
 def _format_notice_period(value: str) -> str:
+    """Format notice period for display"""
     notice = _clean(value)
     if not notice:
         return "Immediate Joiner"
@@ -68,6 +103,7 @@ def _format_notice_period(value: str) -> str:
 
 
 def _build_candidate_lines(candidates: Iterable[dict]) -> str:
+    """Build formatted candidate lines for email body"""
     candidate_rows = list(candidates)
     if not candidate_rows:
         return "- No strong candidates identified yet for this requirement."
@@ -75,7 +111,7 @@ def _build_candidate_lines(candidates: Iterable[dict]) -> str:
     lines = []
     for candidate in candidate_rows[:3]:
         name = _clean(str(candidate.get("candidate_name", ""))) or "Candidate"
-        skills = _clean(str(candidate.get("candidate_skills", ""))) or "Relevant Oracle Fusion skills"
+        skills = _clean(str(candidate.get("skills", ""))) or "Relevant Oracle Fusion skills"
         notice_period = _format_notice_period(str(candidate.get("notice_period_days", "")))
         lines.append(f"- {name} | {skills} | {notice_period}")
 
@@ -83,13 +119,16 @@ def _build_candidate_lines(candidates: Iterable[dict]) -> str:
 
 
 def _build_body(row_num: int, role: str, company: str, candidates: Iterable[dict]) -> str:
+    """Build email body with cleaned company name"""
     role_text = _clean(role) or "L2 Application Support Oracle Fusion Financials"
+    company_text = _clean_company_name(company)  # Use cleaned company name
     sender_name = _clean(os.getenv("MAIL_SENDER_NAME", "Abhishek"))
     sender_title = _clean(os.getenv("MAIL_SENDER_TITLE", "Business Development Executive, RSI"))
     candidate_lines = _build_candidate_lines(candidates)
     template = _load_email_template()
 
-    _ = row_num, company  # Reserved for future placeholders.
+    # Use company_text for any future placeholders
+    _ = row_num, company_text
 
     return template.format(
         role=role_text,
@@ -100,6 +139,7 @@ def _build_body(row_num: int, role: str, company: str, candidates: Iterable[dict
 
 
 def _smtp_send(recipient: str, subject: str, body: str) -> tuple[bool, str]:
+    """Send email via SMTP"""
     server = os.getenv("SMTP_SERVER", "smtp.gmail.com")
     port = int(os.getenv("SMTP_PORT", "587"))
     sender = _clean(os.getenv("SENDER_EMAIL", ""))
@@ -132,6 +172,7 @@ def _smtp_send(recipient: str, subject: str, body: str) -> tuple[bool, str]:
 
 
 def _sendgrid_send(recipient: str, subject: str, body: str) -> tuple[bool, str]:
+    """Send email via SendGrid API"""
     api_key = _clean(os.getenv("SENDGRID_API_KEY", ""))
     sender = _clean(os.getenv("SENDGRID_SENDER_EMAIL", os.getenv("SENDER_EMAIL", "")))
     if not api_key or not sender:
@@ -164,30 +205,116 @@ def _sendgrid_send(recipient: str, subject: str, body: str) -> tuple[bool, str]:
         return False, f"SendGrid send failed: {exc}"
 
 
+def filter_jobs_with_matches(matches_df: pd.DataFrame, jd_catalog_df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Filter JD catalog to only include jobs that have at least one matching candidate.
+    Returns empty DataFrame if no jobs have matches.
+    """
+    if matches_df is None or matches_df.empty:
+        print("\n⚠️ No matching candidates found. No jobs qualify for email dispatch.")
+        return pd.DataFrame()
+    
+    # Check if row_num column exists
+    if "row_num" not in matches_df.columns:
+        print("\n⚠️ Warning: 'row_num' column not found in matches. Cannot filter jobs.")
+        print("   Will attempt to send emails for all jobs.")
+        return jd_catalog_df
+    
+    # Get unique row_num values from matches (jobs with at least one candidate)
+    job_rows_with_matches = set(matches_df["row_num"].unique())
+    
+    # Filter JD catalog to only jobs that have matches
+    filtered_jd_catalog = jd_catalog_df[jd_catalog_df["row_num"].isin(job_rows_with_matches)].copy()
+    
+    total_jobs = len(jd_catalog_df)
+    jobs_with_matches = len(filtered_jd_catalog)
+    jobs_without_matches = total_jobs - jobs_with_matches
+    
+    print(f"\n{'='*60}")
+    print("📧 EMAIL DISPATCH FILTER")
+    print(f"{'='*60}")
+    print(f"Total jobs in catalog:     {total_jobs}")
+    print(f"Jobs with matching candidates: {jobs_with_matches}")
+    print(f"Jobs without any matches:  {jobs_without_matches}")
+    
+    if jobs_without_matches > 0:
+        print(f"\n✅ Will send emails only for {jobs_with_matches} job(s) that have candidates.")
+        print(f"❌ Skipping {jobs_without_matches} job(s) with no matching candidates.")
+    
+    if jobs_with_matches == 0:
+        print("\n🚫 NO EMAILS WILL BE SENT - No jobs have matching candidates.")
+    
+    return filtered_jd_catalog
+
+
 def dispatch_shortlist_emails(
     matches_df: pd.DataFrame,
     jd_catalog_df: pd.DataFrame,
     output_file: Path,
     config: EmailDispatchConfig,
 ) -> pd.DataFrame:
+    """
+    Dispatch emails for jobs with matching candidates.
+    Handles missing company names gracefully.
+    """
     load_project_env(Path(__file__).resolve().parents[2])
     output_file.parent.mkdir(parents=True, exist_ok=True)
+    
+    # Safety check for empty matches
+    if matches_df is None or matches_df.empty:
+        print("\n" + "="*60)
+        print("❌ EMAIL DISPATCH SKIPPED")
+        print("="*60)
+        print("Reason: No matches found (empty matches DataFrame).")
+        print("This usually means:")
+        print("  • No candidate profiles were loaded")
+        print("  • Candidate file is empty or has wrong columns")
+        print("  • No candidates matched any jobs")
+        print("\nNo emails will be sent.")
+        
+        empty_df = pd.DataFrame(columns=["row_num", "provider", "recipient", "status", "message", "subject"])
+        empty_df.to_csv(output_file, index=False)
+        return empty_df
+    
+    # Filter to only jobs with matching candidates
+    filtered_jd_catalog = filter_jobs_with_matches(matches_df, jd_catalog_df)
+    
+    # If no jobs have matches, return empty
+    if filtered_jd_catalog.empty:
+        print("\n" + "="*60)
+        print("❌ EMAIL DISPATCH SKIPPED")
+        print("="*60)
+        print("Reason: No jobs found with matching candidates.")
+        print("No emails will be sent.")
+        
+        empty_df = pd.DataFrame(columns=["row_num", "provider", "recipient", "status", "message", "subject"])
+        empty_df.to_csv(output_file, index=False)
+        return empty_df
 
+    # Get recipient email
     recipient = _clean(config.notification_email) or _clean(os.getenv("PIPELINE_NOTIFICATION_EMAIL", ""))
     if not recipient:
         recipient = _clean(os.getenv("DEFAULT_FALLBACK_RECIPIENT", ""))
 
     dispatch_rows: list[dict] = []
 
-    for _, jd in jd_catalog_df.iterrows():
+    # Iterate over filtered catalog
+    for _, jd in filtered_jd_catalog.iterrows():
         row_num = int(jd.get("row_num", 0))
         role = str(jd.get("role", ""))
         company = str(jd.get("company", ""))
 
+        # Get candidates for this specific job
         candidates = []
-        if not matches_df.empty:
+        if not matches_df.empty and "row_num" in matches_df.columns:
             candidates = matches_df[matches_df["row_num"] == row_num].head(5).to_dict("records")
+        
+        # Skip if no candidates for this job
+        if not candidates:
+            print(f"⚠️ Warning: Job '{role}' at {company} (row_num={row_num}) has no candidates. Skipping.")
+            continue
 
+        # Build subject and body (company name is cleaned inside these functions)
         subject = _build_subject(role, company)
         body = _build_body(row_num, role, company, candidates)
 
@@ -211,12 +338,13 @@ def dispatch_shortlist_emails(
                     "provider": config.provider,
                     "recipient": recipient,
                     "status": "dry-run",
-                    "message": "Email generation only (send disabled)",
+                    "message": f"Would send email for {len(candidates)} candidate(s) (send disabled)",
                     "subject": subject,
                 }
             )
             continue
 
+        # Send actual email
         provider = config.provider.lower().strip()
         if provider == "sendgrid":
             success, message = _sendgrid_send(recipient, subject, body)
@@ -233,6 +361,24 @@ def dispatch_shortlist_emails(
                 "subject": subject,
             }
         )
+    
+    # Print summary
+    if dispatch_rows:
+        print(f"\n{'='*60}")
+        print("📧 EMAIL DISPATCH SUMMARY")
+        print(f"{'='*60}")
+        print(f"Emails dispatched for {len(dispatch_rows)} job(s) with candidates")
+        
+        if not config.send_emails:
+            print("⚠️ DRY-RUN MODE: No actual emails were sent")
+            print(f"   Would have sent {len(dispatch_rows)} email(s)")
+        elif config.send_emails:
+            sent = sum(1 for r in dispatch_rows if r["status"] == "sent")
+            failed = sum(1 for r in dispatch_rows if r["status"] == "failed")
+            print(f"✅ Successfully sent: {sent}")
+            print(f"❌ Failed: {failed}")
+    else:
+        print("\n✅ No emails to dispatch - all jobs lacked matching candidates")
 
     dispatch_df = pd.DataFrame(
         dispatch_rows,
