@@ -33,7 +33,6 @@ text
 
 ## Architecture
 
-```text
 ┌─────────────────────────────────────────────────────────────────────────────────────┐
 │                              HIRING PIPELINE SYSTEM                                  │
 │                                                                                      │
@@ -55,18 +54,20 @@ text
 │                                          │  Dashboard   │◀───│    Web UI    │       │
 │                                          └──────────────┘    └──────────────┘       │
 └─────────────────────────────────────────────────────────────────────────────────────┘
-What This Repository Runs
+
+## What This Repository Runs
+
 Main pipeline entrypoint: run_integrated_pipeline.py
 
 Dashboard entrypoint: src/dashboard/app.py
 
-Windows launchers:
+## Windows launchers:
 
 Run_Integrated_Pipeline.bat - Launches the main pipeline
 
 Run_Dashboard.bat - Launches the Streamlit dashboard
 
-Prerequisites
+## Prerequisites
 Python 3.10+ (Python 3.11 or 3.12 recommended)
 
 Windows PowerShell (examples below are for PowerShell)
@@ -75,18 +76,18 @@ Internet access for Naukri scraping and JD page fetch
 
 Gmail account (for SMTP email sending) or SendGrid account
 
-Complete Setup Guide
-Step 1: Clone or Download the Repository
+## Complete Setup Guide
+# Step 1: Clone or Download the Repository
 powershell
 git clone https://github.com/AbhiInfy/hiring-pipeline-integrated.git
 cd hiring-pipeline-integrated
-Step 2: Create and Activate Virtual Environment
+# Step 2: Create and Activate Virtual Environment
 powershell
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 You should see (.venv) appear at the beginning of your prompt.
 
-Step 3: Install Dependencies
+# Step 3: Install Dependencies
 powershell
 pip install -r requirements.txt
 If requirements.txt doesn't exist, install manually:
@@ -181,7 +182,7 @@ Running the Pipeline
 Important: Dry-Run vs Real Emails
 By default, the pipeline runs in DRY-RUN mode - no emails are actually sent. You must explicitly add --send-emails to send real emails.
 
-Basic Commands
+## Basic Commands
 1. Dry Run (Test without sending emails)
 powershell
 python run_integrated_pipeline.py
@@ -194,7 +195,7 @@ python run_integrated_pipeline.py --send-emails --email-provider smtp --notifica
 4. Send Real Emails (SendGrid)
 powershell
 python run_integrated_pipeline.py --send-emails --email-provider sendgrid --notification-email recruiter@example.com
-Advanced Commands
+## Advanced Commands
 Custom Matching Threshold
 Lower threshold to get more matches (default is 0.12):
 
@@ -436,15 +437,3 @@ Verify all prerequisites are installed correctly
 License
 This project is open-source and available for use and modification.
 
-text
-
-## Key Updates Made:
-
-1. **Added Project Overview section** - Explains what the project does, key features, use cases, and how it works
-2. **Clarified candidate file requirement** - Emphasized that the user MUST manually create the Excel file and the pipeline will NOT auto-populate it
-3. **Added warning about empty template** - The pipeline creates an empty template with headers only, not populated with data
-4. **Step-by-step setup** - Clear, numbered steps from cloning to verification
-5. **Dry-run emphasis** - Clearly states that emails are dry-run by default
-6. **Complete command examples** - All possible run options with explanations
-7. **Enhanced troubleshooting** - Specific solutions for common issues
-8. **Example workflow** - Complete end-to-end example from file creation to dashboard
