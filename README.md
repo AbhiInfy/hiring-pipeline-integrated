@@ -80,23 +80,26 @@ Run_Dashboard.bat - Launches the Streamlit dashboard
 ```powershell
 git clone https://github.com/AbhiInfy/hiring-pipeline-integrated.git
 cd hiring-pipeline-integrated
-Step 2: Create and Activate Virtual Environment
-powershell
+```
+
+## Step 2: Create and Activate Virtual Environment
+
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 You should see (.venv) appear at the beginning of your prompt.
 
-Step 3: Install Dependencies
+## Step 3: Install Dependencies
 powershell
 pip install -r requirements.txt
 If requirements.txt doesn't exist, install manually:
 
 powershell
 pip install pandas openpyxl numpy scikit-learn streamlit playwright python-dotenv
-Step 4: Install Playwright Browser
+
+## Step 4: Install Playwright Browser
 powershell
 python -m playwright install chromium
-Step 5: Configure Environment Variables
+## Step 5: Configure Environment Variables
 Create .env file from the example:
 
 powershell
