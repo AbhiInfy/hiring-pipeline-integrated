@@ -16,12 +16,23 @@ from src.adapters.jd_generator_adapter import generate_jd_catalog as generate_jd
 from src.adapters.matching_adapter import match_candidates_to_jd_adapter
 from src.matching.engine import MatchConfig, match_candidates_to_jd
 
+# NEW: Import email extractor
+from src.email_extractor.candidate_extractor import extract_candidates_from_emails
+
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Run the 5-stage integrated hiring architecture pipeline.")
     parser.add_argument("--candidate-profiles-file", default="")
     parser.add_argument("--profile-dir", default="")
     parser.add_argument("--output", default="output/job_links.xlsx")
+
+    # NEW: Email extraction arguments
+    parser.add_argument("--extract-from-emails", action="store_true", 
+                       help="Extract candidates from emails before running pipeline")
+    parser.add_argument("--email-hours", type=int, default=24,
+                       help="Hours back to scan emails (default: 24)")
+    parser.add_argument("--max-emails", type=int, default=50,
+                       help="Maximum emails to process (default: 50)")
 
     parser.add_argument("--keyword", default="Oracle Fusion Application")
     parser.add_argument("--pages", type=int, default=3)
@@ -179,6 +190,21 @@ def main() -> int:
     paths.job_links_file = output_path
     runtime_warnings: list[str] = []
 
+    # NEW: Stage 0 - Extract candidates from emails
+    if args.extract_from_emails:
+        print("\n" + "="*60)
+        print("[Stage 0/6] Email Candidate Extraction...")
+        print("="*60)
+        new_candidates = extract_candidates_from_emails(
+            hours_back=args.email_hours, 
+            max_emails=args.max_emails
+        )
+        if new_candidates > 0:
+            print(f"✅ Added {new_candidates} new candidates to database")
+        else:
+            print("ℹ️ No new candidates found")
+        print()
+
     print("[Stage 1/5] Job Generator (JD Generation)...")
     scrape_job_links(
         keyword=args.keyword,
@@ -218,6 +244,9 @@ def main() -> int:
         print("  • Required columns: Candidate Name, Skills, Email ID, Notice Period (Days)")
         print("  • At least one row with candidate name and skills")
         print("  • File is not open in another program")
+        print("\nOptions:")
+        print("  1. Create the file manually with candidate data")
+        print("  2. Run with --extract-from-emails to auto-populate from emails")
         print("\nAfter fixing the file, re-run the pipeline.")
         return 1
 
@@ -276,6 +305,7 @@ def main() -> int:
         "used_jd_mode": jd_mode_used,
         "requested_matching_mode": args.matching_mode,
         "used_matching_mode": matching_mode_used,
+        "email_extraction_enabled": args.extract_from_emails,
         "warnings": runtime_warnings,
         "job_links_file": str(paths.job_links_file),
         "jd_catalog_file": str(paths.jd_catalog_file),

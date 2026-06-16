@@ -29,31 +29,30 @@ Stage 3: Matching Engine → Matches candidates to jobs using similarity algorit
 Stage 4: Email Dispatch → Sends shortlists to recruiters (dry-run by default)
 Stage 5: Dashboard → Visualizes results in Streamlit
 
-text
-
 ## Architecture
-
 ┌─────────────────────────────────────────────────────────────────────────────────────┐
-│                              HIRING PIPELINE SYSTEM                                  │
-│                                                                                      │
-│  ┌──────────────┐    ┌──────────────┐    ┌──────────────┐    ┌──────────────┐       │
-│  │   STAGE 1    │    │   STAGE 2    │    │   STAGE 3    │    │   STAGE 4    │       │
-│  │    Job       │───▶│  Candidate   │───▶│  Matching    │───▶│   Email      │       │
-│  │  Ingestion   │    │   Database   │    │   Engine     │    │  Dispatch    │       │
-│  └──────────────┘    └──────────────┘    └──────────────┘    └──────────────┘       │
-│         │                   │                   │                   │               │
-│         ▼                   ▼                   ▼                   ▼               │
-│  ┌──────────────┐    ┌──────────────┐    ┌──────────────┐    ┌──────────────┐       │
-│  │   Naukri     │    │   Excel      │    │  Jaccard     │    │   SMTP/      │       │
-│  │   Web Scrape │    │   File       │    │  Similarity  │    │  SendGrid    │       │
-│  └──────────────┘    └──────────────┘    └──────────────┘    └──────────────┘       │
-│                                                   │                                   │
-│                                                   ▼                                   │
-│                                          ┌──────────────┐    ┌──────────────┐       │
-│                                          │   STAGE 5    │    │  Streamlit   │       │
-│                                          │  Dashboard   │◀───│    Web UI    │       │
-│                                          └──────────────┘    └──────────────┘       │
+│ HIRING PIPELINE SYSTEM │
+│ │
+│ ┌──────────────┐ ┌──────────────┐ ┌──────────────┐ ┌──────────────┐ │
+│ │ STAGE 1 │ │ STAGE 2 │ │ STAGE 3 │ │ STAGE 4 │ │
+│ │ Job │───▶│ Candidate │───▶│ Matching │───▶│ Email │ │
+│ │ Ingestion │ │ Database │ │ Engine │ │ Dispatch │ │
+│ └──────────────┘ └──────────────┘ └──────────────┘ └──────────────┘ │
+│ │ │ │ │ │
+│ ▼ ▼ ▼ ▼ │
+│ ┌──────────────┐ ┌──────────────┐ ┌──────────────┐ ┌──────────────┐ │
+│ │ Naukri │ │ Excel │ │ Jaccard │ │ SMTP/ │ │
+│ │ Web Scrape │ │ File │ │ Similarity │ │ SendGrid │ │
+│ └──────────────┘ └──────────────┘ └──────────────┘ └──────────────┘ │
+│ │ │
+│ ▼ │
+│ ┌──────────────┐ ┌──────────────┐ │
+│ │ STAGE 5 │ │ Streamlit │ │
+│ │ Dashboard │◀───│ Web UI │ │
+│ └──────────────┘ └──────────────┘ │
 └─────────────────────────────────────────────────────────────────────────────────────┘
+
+text
 
 ## What This Repository Runs
 
@@ -68,26 +67,26 @@ Run_Integrated_Pipeline.bat - Launches the main pipeline
 Run_Dashboard.bat - Launches the Streamlit dashboard
 
 ## Prerequisites
-Python 3.10+ (Python 3.11 or 3.12 recommended)
 
-Windows PowerShell (examples below are for PowerShell)
-
-Internet access for Naukri scraping and JD page fetch
-
-Gmail account (for SMTP email sending) or SendGrid account
+- Python 3.10+ (Python 3.11 or 3.12 recommended)
+- Windows PowerShell (examples below are for PowerShell)
+- Internet access for Naukri scraping and JD page fetch
+- Gmail account (for SMTP email sending) or SendGrid account
 
 ## Complete Setup Guide
-# Step 1: Clone or Download the Repository
-powershell
+
+### Step 1: Clone or Download the Repository
+
+```powershell
 git clone https://github.com/AbhiInfy/hiring-pipeline-integrated.git
 cd hiring-pipeline-integrated
-# Step 2: Create and Activate Virtual Environment
+Step 2: Create and Activate Virtual Environment
 powershell
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 You should see (.venv) appear at the beginning of your prompt.
 
-# Step 3: Install Dependencies
+Step 3: Install Dependencies
 powershell
 pip install -r requirements.txt
 If requirements.txt doesn't exist, install manually:
@@ -106,32 +105,112 @@ Edit .env with your values:
 
 powershell
 notepad .env
-Required environment variables for email sending:
+🔐 Environment Configuration (.env file)
+The pipeline uses a .env file to securely manage email credentials and notification settings. This file is required for sending real emails and must be created before running the pipeline with the --send-emails flag.
 
-env
-# SMTP Configuration (for Gmail)
+Required Variables
+Variable	Description	Example
+SMTP_SERVER	SMTP server address (for Gmail)	smtp.gmail.com
+SMTP_PORT	SMTP server port	587
+SENDER_EMAIL	Email address that will send the notifications	your-email@gmail.com
+SENDER_PASSWORD	App-specific password (not your regular email password)	abcd efgh ijkl mnop
+PIPELINE_NOTIFICATION_EMAIL	Default recipient for all email dispatches	recruiter@company.com
+DEFAULT_FALLBACK_RECIPIENT	Fallback recipient if no other is specified	hr-backup@company.com
+Optional Variables
+Variable	Description	Default Behavior
+MAIL_SENDER_NAME	Display name in the "From" field	Falls back to SENDER_EMAIL
+MAIL_SENDER_TITLE	Your title/role (e.g., "Talent Acquisition Lead")	Omitted if not set
+EMAIL_SUBJECT_PREFIX	Custom prefix for email subjects	Shortlist Update:
+Complete .env Example
+Here's a fully configured example file:
+
+ini
+# Email Configuration
 SMTP_SERVER=smtp.gmail.com
 SMTP_PORT=587
-SENDER_EMAIL=your-email@gmail.com
+SENDER_EMAIL=alerts@yourcompany.com
 SENDER_PASSWORD=your-16-character-app-password
 
-# Email Recipients
-PIPELINE_NOTIFICATION_EMAIL=recruiter@example.com
-DEFAULT_FALLBACK_RECIPIENT=recruiter@example.com
+# Recipient Settings
+PIPELINE_NOTIFICATION_EMAIL=recruiting-team@yourcompany.com
+DEFAULT_FALLBACK_RECIPIENT=admin@yourcompany.com
 
-# Email Customization (optional)
-MAIL_SENDER_NAME=Your Name
-MAIL_SENDER_TITLE=Your Title
-Important for Gmail:
+# Personalization (optional)
+MAIL_SENDER_NAME="Hiring Pipeline Bot"
+MAIL_SENDER_TITLE="Automated Recruitment System"
+EMAIL_SUBJECT_PREFIX="[Hiring Pipeline]"
+⚠️ Critical Gmail Setup Notes
+If you are using Gmail as your SMTP provider, standard passwords will not work. You must:
 
-Enable 2-Factor Authentication on your Google account
+Enable 2-Factor Authentication on your Google account.
 
-Generate an App Password (16 characters) at: Google Account → Security → App Passwords
+Generate an App Password:
 
-Use the App Password as SENDER_PASSWORD (NOT your regular password)
+Go to your Google Account → Security → App Passwords.
 
-Step 6: Prepare Candidate Excel File ⚠️ IMPORTANT
-You MUST manually create this file. The pipeline will NOT create it for you!
+Select Mail as the app and Windows Computer as the device.
+
+Copy the generated 16-character password (spaces are optional).
+
+Use that App Password as the value for SENDER_PASSWORD in your .env file.
+
+❌ Do not use your regular Gmail password. It will fail with an authentication error.
+
+Testing Your Configuration
+To verify your email settings without running the full pipeline, you can use a quick test script:
+
+python
+# test_email.py
+from dotenv import load_dotenv
+import os
+import smtplib
+from email.message import EmailMessage
+
+load_dotenv()
+
+msg = EmailMessage()
+msg['Subject'] = 'Test from Hiring Pipeline'
+msg['From'] = os.getenv('SENDER_EMAIL')
+msg['To'] = os.getenv('PIPELINE_NOTIFICATION_EMAIL')
+msg.set_content('SMTP configuration is working!')
+
+try:
+    with smtplib.SMTP(os.getenv('SMTP_SERVER'), int(os.getenv('SMTP_PORT'))) as server:
+        server.starttls()
+        server.login(os.getenv('SENDER_EMAIL'), os.getenv('SENDER_PASSWORD'))
+        server.send_message(msg)
+    print("✅ Test email sent successfully!")
+except Exception as e:
+    print(f"❌ Failed: {e}")
+Run it with:
+
+powershell
+python test_email.py
+Security Best Practices
+Never commit your .env file to version control. The repository already includes .env in .gitignore.
+
+Use environment-specific .env files (e.g., .env.production, .env.staging) if needed.
+
+Rotate app passwords periodically, especially after team member changes.
+
+Restrict file permissions on the .env file in production environments (e.g., chmod 600 .env on Linux/macOS).
+
+Troubleshooting Common .env Issues
+Problem	Likely Cause	Solution
+ModuleNotFoundError: No module named 'dotenv'	python-dotenv not installed	Run pip install python-dotenv
+Emails not sending even with --send-emails	.env file missing or variables misnamed	Ensure .env exists and variable names match exactly (case-sensitive)
+SMTPAuthenticationError	Using regular Gmail password instead of App Password	Generate and use a 16-character App Password
+Recipient address rejected	Missing or malformed recipient email	Verify PIPELINE_NOTIFICATION_EMAIL is a valid email address
+Variables not loading	.env file not in the root directory	Move .env to the same folder as run_integrated_pipeline.py
+Command-Line Override
+Any variable set in the .env file can be overridden at runtime using CLI arguments. For example:
+
+powershell
+python run_integrated_pipeline.py --send-emails --notification-email emergency@example.com
+This overrides PIPELINE_NOTIFICATION_EMAIL just for this run without modifying the .env file.
+
+Step 6: Prepare Candidate Excel File
+⚠️ IMPORTANT: You MUST manually create this file. The pipeline will NOT create it for you!
 
 Create an Excel file at output/candidate_profiles.xlsx with the following structure:
 
@@ -182,44 +261,54 @@ Running the Pipeline
 Important: Dry-Run vs Real Emails
 By default, the pipeline runs in DRY-RUN mode - no emails are actually sent. You must explicitly add --send-emails to send real emails.
 
-## Basic Commands
-1. Dry Run (Test without sending emails)
+Basic Commands
+Dry Run (Test without sending emails)
+
 powershell
 python run_integrated_pipeline.py
-2. Run with Custom Keyword
+Run with Custom Keyword
+
 powershell
 python run_integrated_pipeline.py --keyword "Oracle Fusion" --pages 5
-3. Send Real Emails (SMTP)
+Send Real Emails (SMTP)
+
 powershell
 python run_integrated_pipeline.py --send-emails --email-provider smtp --notification-email recruiter@example.com
-4. Send Real Emails (SendGrid)
+Send Real Emails (SendGrid)
+
 powershell
 python run_integrated_pipeline.py --send-emails --email-provider sendgrid --notification-email recruiter@example.com
-## Advanced Commands
+Advanced Commands
 Custom Matching Threshold
 Lower threshold to get more matches (default is 0.12):
 
 powershell
 python run_integrated_pipeline.py --min-score 0.05 --send-emails --notification-email recruiter@example.com
 Force Heuristic Mode (More Reliable, No External Dependencies)
+
 powershell
 python run_integrated_pipeline.py --jd-mode heuristic --matching-mode jaccard --send-emails --notification-email recruiter@example.com
 Force Adapter Mode (Better Matching, Requires project-job-generator)
+
 powershell
 python run_integrated_pipeline.py --jd-mode adapter --matching-mode adapter --job-generator-dir ..\project-job-generator --send-emails --notification-email recruiter@example.com
 Manual Naukri Login (If Scraping Fails)
+
 powershell
 python run_integrated_pipeline.py --login --keyword "Oracle Fusion" --pages 3
 Complete Production Command
+
 powershell
 python run_integrated_pipeline.py --keyword "Oracle Fusion" --pages 3 --jd-mode auto --matching-mode auto --min-score 0.05 --top-k 5 --send-emails --email-provider smtp --notification-email recruiter@example.com
 Using Windows Batch Files
 The repository includes two batch files for convenience:
 
 Run Pipeline
+
 powershell
 .\Run_Integrated_Pipeline.bat --keyword "Oracle Fusion" --pages 3 --send-emails --notification-email recruiter@example.com
 Launch Dashboard
+
 powershell
 .\Run_Dashboard.bat
 Fixing Unicode/Encoding Issues on Windows
@@ -319,12 +408,14 @@ Email Delivery Verification
 After each run, verify delivery status from output files:
 
 output/email_dispatch.csv
+
 Status	Meaning
 sent	Email accepted by provider
 dry-run	No real send attempted (default)
 failed	Send failed (check message column)
 skipped	No recipient configured or no matches
 output/pipeline_summary.json
+
 json
 {
   "total_jobs": 25,
@@ -437,3 +528,18 @@ Verify all prerequisites are installed correctly
 License
 This project is open-source and available for use and modification.
 
+text
+
+---
+
+This complete README file includes:
+
+1. **Enhanced `.env` configuration section** with detailed tables, examples, and troubleshooting
+2. **Email testing script** for verifying SMTP configuration
+3. **Security best practices** for `.env` file management
+4. **Command-line override documentation**
+5. **Complete troubleshooting guide** for all common issues
+6. **Better formatting** with clear sections and tables
+7. **All original content** preserved and improved
+
+You can copy this entire file and replace your existing `README.md` with it.
