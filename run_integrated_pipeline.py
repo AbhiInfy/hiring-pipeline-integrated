@@ -13,6 +13,8 @@ from src.env_loader import load_project_env
 from src.ingest.naukri_scraper import scrape_job_links
 from src.job_generator.jd_service import generate_jd_catalog as generate_jd_catalog_heuristic
 from src.matching.engine import MatchConfig, match_candidates_to_jd
+from src.embeddings import GroqEmbeddingsService, SentenceTransformersEmbeddingsService, HybridEmbeddingsService
+from src.matching.semantic_matching import SemanticMatcher
 
 # Import email extractor
 from src.email_extractor.candidate_extractor import extract_candidates_from_emails
@@ -42,6 +44,17 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--rows", type=int, default=None)
     parser.add_argument("--top-k", type=int, default=5)
     parser.add_argument("--min-score", type=float, default=0.12)
+
+    # Embeddings and semantic matching arguments
+    parser.add_argument("--use-embeddings", action="store_true",
+                       help="Enable semantic matching with embeddings")
+    parser.add_argument("--embedding-model", choices=["hybrid", "groq", "sentence-transformers"], default="hybrid",
+                       help="Embedding model to use (default: hybrid - Groq + Sentence Transformers fallback)")
+    parser.add_argument("--blend-ratio", type=float, default=0.7,
+                       help="Weight for semantic score in blended matching (0.0-1.0, default: 0.7)")
+    parser.add_argument("--cache-embeddings", action="store_true",
+                       help="Cache embeddings to disk for faster re-runs")
+
     parser.add_argument("--default-email", default="chaturvedi.abhishek10@gmail.com")
     parser.add_argument("--email-provider", choices=["smtp", "sendgrid"], default="smtp")
     parser.add_argument("--send-emails", action="store_true")
@@ -143,13 +156,63 @@ def main() -> int:
     jd_catalog.to_csv(paths.jd_catalog_file, index=False)
     print(f"JD generation mode used: {jd_mode_used}")
 
-    # Use Jaccard matching only
-    matches = match_candidates_to_jd(
-        jd_catalog,
-        candidate_profiles,
-        config=MatchConfig(top_k=args.top_k, min_score=args.min_score),
-    )
+    # Determine matching mode
     matching_mode_used = "jaccard"
+    embeddings_service = None
+
+    if args.use_embeddings:
+        import os
+        groq_api_key = os.getenv("GROQ_API_KEY")
+        cache_dir = None
+        if args.cache_embeddings:
+            cache_dir = paths.integration_root / "vectorstore"
+
+        try:
+            # Initialize embeddings service based on choice
+            if args.embedding_model == "hybrid":
+                print("🔄 Initializing hybrid embeddings (Groq + Sentence Transformers fallback)...")
+                embeddings_service = HybridEmbeddingsService(api_key=groq_api_key, cache_dir=cache_dir)
+                print("✅ Hybrid embeddings service initialized")
+
+            elif args.embedding_model == "groq":
+                if not groq_api_key:
+                    print("⚠️ GROQ_API_KEY not set, using Sentence Transformers instead")
+                    embeddings_service = SentenceTransformersEmbeddingsService(cache_dir=cache_dir)
+                else:
+                    print("🔄 Initializing Groq embeddings...")
+                    embeddings_service = GroqEmbeddingsService(api_key=groq_api_key, cache_dir=cache_dir)
+                    print("✅ Groq embeddings service initialized")
+
+            else:  # sentence-transformers
+                print("🔄 Initializing Sentence Transformers embeddings...")
+                embeddings_service = SentenceTransformersEmbeddingsService(cache_dir=cache_dir)
+                print("✅ Sentence Transformers embeddings service initialized")
+
+            matcher = SemanticMatcher(
+                embeddings_service=embeddings_service,
+                blend_ratio=args.blend_ratio,
+                config=MatchConfig(top_k=args.top_k, min_score=args.min_score)
+            )
+
+            matches = matcher.match_candidates_to_jd_semantic(jd_catalog, candidate_profiles)
+            matching_mode_used = f"semantic+token ({args.embedding_model}, blend={args.blend_ratio})"
+            print(f"✅ Using semantic matching with {args.embedding_model} embeddings")
+
+        except Exception as e:
+            print(f"⚠️ Semantic matching failed: {e}")
+            print("Falling back to token-based matching...")
+            matches = match_candidates_to_jd(
+                jd_catalog,
+                candidate_profiles,
+                config=MatchConfig(top_k=args.top_k, min_score=args.min_score),
+            )
+    else:
+        # Use Jaccard matching only
+        matches = match_candidates_to_jd(
+            jd_catalog,
+            candidate_profiles,
+            config=MatchConfig(top_k=args.top_k, min_score=args.min_score),
+        )
 
     print(f"Matching mode used: {matching_mode_used}")
     print(f"Total matches found: {len(matches)}")

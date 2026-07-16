@@ -10,6 +10,8 @@ import pandas as pd
 class MatchConfig:
     top_k: int = 5
     min_score: float = 0.12
+    use_embeddings: bool = False
+    blend_ratio: float = 0.7
 
 
 MATCH_OUTPUT_COLUMNS = [
@@ -26,6 +28,8 @@ MATCH_OUTPUT_COLUMNS = [
     "overlap_terms",
 ]
 
+MATCH_COLUMNS = MATCH_OUTPUT_COLUMNS
+
 
 def _tokenize(text: str) -> set[str]:
     tokens = set(re.findall(r"[a-zA-Z0-9+#._-]+", str(text).lower()))
@@ -40,6 +44,11 @@ def _jaccard(a: set[str], b: set[str]) -> float:
     if not a or not b:
         return 0.0
     return len(a.intersection(b)) / len(a.union(b))
+
+
+def _calculate_jaccard_similarity(a: set[str], b: set[str]) -> float:
+    """Alias for _jaccard for clarity in semantic_matching module."""
+    return _jaccard(a, b)
 
 
 def match_candidates_to_jd(jd_df: pd.DataFrame, candidate_df: pd.DataFrame, config: MatchConfig | None = None) -> pd.DataFrame:

@@ -95,7 +95,61 @@ def main() -> None:
     st.dataframe(shortlist_df, use_container_width=True)
 
     st.markdown("### Score Distribution")
-    st.bar_chart(shortlist_df.groupby("candidate_name")["match_score"].max().sort_values(ascending=False).head(20))
+
+    # Determine which score column to use
+    # Semantic matching uses 'final_score', token-based uses 'match_score'
+    score_column = None
+    if "final_score" in shortlist_df.columns:
+        score_column = "final_score"
+    elif "match_score" in shortlist_df.columns:
+        score_column = "match_score"
+
+    if score_column:
+        st.bar_chart(
+            shortlist_df.groupby("candidate_name")[score_column]
+            .max()
+            .sort_values(ascending=False)
+            .head(20)
+        )
+    else:
+        st.warning("No score column found in matches data")
+
+    # Show semantic matching details if available
+    if "semantic_score" in shortlist_df.columns and "token_score" in shortlist_df.columns:
+        st.markdown("### Semantic Matching Details")
+        col1, col2, col3 = st.columns(3)
+
+        with col1:
+            st.metric(
+                "Avg Semantic Score",
+                f"{shortlist_df['semantic_score'].mean():.3f}",
+                help="Cosine similarity of embeddings (higher = more semantically similar)"
+            )
+
+        with col2:
+            st.metric(
+                "Avg Token Score",
+                f"{shortlist_df['token_score'].mean():.3f}",
+                help="Jaccard similarity of keywords (higher = more keyword overlap)"
+            )
+
+        with col3:
+            st.metric(
+                "Avg Final Score",
+                f"{shortlist_df['final_score'].mean():.3f}",
+                help="Blended score (70% semantic + 30% token)"
+            )
+
+        # Show score comparison
+        st.markdown("#### Score Comparison")
+        score_comparison = shortlist_df[["candidate_name", "semantic_score", "token_score", "final_score"]].head(10)
+        st.dataframe(score_comparison, use_container_width=True)
+
+    # Show skill match details if available
+    if "skill_match_details" in shortlist_df.columns:
+        st.markdown("### Skill Match Details")
+        details_df = shortlist_df[["candidate_name", "role", "skill_match_details"]].head(20)
+        st.dataframe(details_df, use_container_width=True)
 
     if dispatch_file.exists():
         st.markdown("### Email Dispatch")
