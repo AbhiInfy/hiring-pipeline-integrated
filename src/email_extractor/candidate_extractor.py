@@ -14,6 +14,11 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 import logging
 from io import BytesIO
+from src.env_loader import load_project_env
+
+# Load .env file
+load_project_env(Path(__file__).resolve().parents[2])
+
 
 # PDF and DOCX extraction
 try:

@@ -1,39 +1,54 @@
 from __future__ import annotations
 
-import json
-from pathlib import Path
-
-import pandas as pd
 import streamlit as st
-from pandas.errors import EmptyDataError
 
-
-def _load_summary(path: Path) -> dict:
-    if not path.exists():
-        return {}
-    return json.loads(path.read_text(encoding="utf-8"))
+from utils.data_loader import (
+    get_output_paths,
+    load_csv,
+    load_summary,
+)
 
 
 def main() -> None:
     st.set_page_config(page_title="Recruiter Dashboard", layout="wide")
-    st.title("Recruiter Dashboard")
-    st.caption("Shortlisted profiles, scores, and pipeline analytics")
+    from datetime import datetime
 
-    root = Path(__file__).resolve().parents[2]
-    output_dir = root / "output"
-    shortlist_file = output_dir / "shortlisted_profiles.csv"
-    dispatch_file = output_dir / "email_dispatch.csv"
-    summary_file = output_dir / "pipeline_summary.json"
+    header_left, header_right = st.columns([4, 1])
+
+    with header_left:
+        st.markdown(
+            """
+            <h1 style="margin-bottom:0;">
+                👋 Welcome back, Admin!
+            </h1>
+            <p style="color:gray; margin-top:0;">
+                 Here's what's happening with your hiring pipeline today.
+            </p>
+             """,
+            unsafe_allow_html=True,
+        )
+
+    with header_right:
+        st.metric(
+              label="Today's Date",
+              value=datetime.now().strftime("%d %b %Y"),
+            )
+
+    st.divider()
+
+    paths = get_output_paths()
+
+
+    shortlist_file = paths["shortlist_file"]
+    dispatch_file = paths["dispatch_file"]
+    summary_file = paths["summary_file"]
 
     if not shortlist_file.exists():
         st.warning("No shortlisted profile data found. Run the architecture pipeline first.")
         return
 
-    try:
-        shortlist_df = pd.read_csv(shortlist_file)
-    except EmptyDataError:
-        shortlist_df = pd.DataFrame()
-    summary = _load_summary(summary_file)
+    shortlist_df = load_csv(shortlist_file)
+    summary = load_summary(summary_file)
 
     requested_jd_mode = str(summary.get("requested_jd_mode", "")).strip()
     used_jd_mode = str(summary.get("used_jd_mode", "")).strip()
@@ -84,11 +99,13 @@ def main() -> None:
 
     if dispatch_file.exists():
         st.markdown("### Email Dispatch")
-        try:
-            dispatch_df = pd.read_csv(dispatch_file)
-            st.dataframe(dispatch_df, use_container_width=True)
-        except EmptyDataError:
+
+        dispatch_df = load_csv(dispatch_file)
+
+        if dispatch_df.empty:
             st.info("Email dispatch log is empty.")
+        else:
+            st.dataframe(dispatch_df, use_container_width=True)
 
 
 if __name__ == "__main__":
