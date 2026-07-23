@@ -392,7 +392,7 @@ class EmailCandidateExtractor:
             candidate = self.extract_candidate_info(msg)
             if candidate:
                 candidates.append(candidate)
-                print(f"  ✓ Found: {candidate['candidate_name']} ({candidate['email']})")
+                print(f"  SUCCESS: Found: {candidate['candidate_name']} ({candidate['email']})")
         
         # Save to Excel
         saved_count = self.save_candidates(candidates)

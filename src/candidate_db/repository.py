@@ -100,7 +100,7 @@ def _ensure_seed_file(path: Path) -> bool:
         ]
     )
     seed.to_excel(path, index=False)
-    print(f"\n📝 Created template Excel file: {path}")
+    print(f"\n INFO: Created template Excel file: {path}")
     print("   Please update with your actual candidate data and re-run the pipeline")
     return True
 
@@ -123,7 +123,7 @@ def load_candidate_profiles(source_path: Path) -> pd.DataFrame:
         error_msg = f"Candidate profiles must be an Excel workbook (.xlsx or .xls). Invalid file: {source_path}"
         logger.error(error_msg)
         print(f"\n{'='*60}")
-        print("❌ ERROR: Invalid File Format")
+        print(" ERROR: Invalid File Format")
         print(f"{'='*60}")
         print(f"File: {source_path}")
         print(f"Format: {source_path.suffix}")
@@ -136,12 +136,12 @@ def load_candidate_profiles(source_path: Path) -> pd.DataFrame:
         is_new = _ensure_seed_file(source_path)
         if is_new:
             # Just created template, return empty DataFrame as no real data
-            print("\n⚠️ Template created but no actual candidate data found.")
+            print("\n WARNING: Template created but no actual candidate data found.")
             print("   Please add your candidates to the Excel file and re-run.")
             return pd.DataFrame()
     except Exception as e:
         logger.error(f"Failed to create seed file: {e}")
-        print(f"\n❌ ERROR: Cannot create template file: {e}")
+        print(f"\n ERROR: Cannot create template file: {e}")
         return pd.DataFrame()
     
     # Validate Excel file before reading
@@ -149,7 +149,7 @@ def load_candidate_profiles(source_path: Path) -> pd.DataFrame:
     if not is_valid:
         logger.error(f"Excel file validation failed: {error_msg}")
         print(f"\n{'='*60}")
-        print("❌ ERROR: Invalid Excel File")
+        print(" ERROR: Invalid Excel File")
         print(f"{'='*60}")
         print(f"File: {source_path}")
         print(f"Error: {error_msg}")
@@ -163,15 +163,15 @@ def load_candidate_profiles(source_path: Path) -> pd.DataFrame:
     try:
         raw = pd.read_excel(source_path, engine='openpyxl')
         logger.info(f"Successfully loaded Excel file: {source_path}")
-        print(f"✓ Successfully loaded: {source_path.name}")
+        print(f" Successfully loaded: {source_path.name}")
     except FileNotFoundError:
         logger.error(f"File not found after validation: {source_path}")
-        print(f"\n❌ ERROR: File not found - {source_path}")
+        print(f"\n ERROR: File not found - {source_path}")
         return pd.DataFrame()
     except PermissionError:
         logger.error(f"Permission denied: {source_path} - File may be open in Excel")
         print(f"\n{'='*60}")
-        print("❌ ERROR: Cannot Read File - Permission Denied")
+        print(" ERROR: Cannot Read File - Permission Denied")
         print(f"{'='*60}")
         print(f"File: {source_path}")
         print("\nThe file may be open in another program (like Excel).")
@@ -180,7 +180,7 @@ def load_candidate_profiles(source_path: Path) -> pd.DataFrame:
     except ValueError as e:
         logger.error(f"Corrupted or invalid Excel file: {e}")
         print(f"\n{'='*60}")
-        print("❌ ERROR: Corrupted or Invalid Excel File")
+        print("ERROR: Corrupted or Invalid Excel File")
         print(f"{'='*60}")
         print(f"File: {source_path}")
         print(f"Error: {str(e)}")
@@ -194,18 +194,18 @@ def load_candidate_profiles(source_path: Path) -> pd.DataFrame:
         return pd.DataFrame()
     except Exception as e:
         logger.error(f"Unexpected error reading Excel file: {e}")
-        print(f"\n❌ ERROR: Failed to read Excel file: {e}")
+        print(f"\n ERROR: Failed to read Excel file: {e}")
         return pd.DataFrame()
     
     # Check if file is empty
     if raw.empty:
         logger.warning(f"Excel file is empty: {source_path}")
-        print(f"\n⚠️ WARNING: Excel file is empty: {source_path.name}")
+        print(f"\n WARNING: Excel file is empty: {source_path.name}")
         print("Please add candidate data to the file and re-run.")
         return pd.DataFrame()
     
     # Print found columns for debugging
-    print(f"\n📋 Found columns in Excel: {list(raw.columns)}")
+    print(f"\n INFO: Found columns in Excel: {list(raw.columns)}")
     
     # Create a new DataFrame for mapped data
     mapped_data = {}
@@ -214,7 +214,7 @@ def load_candidate_profiles(source_path: Path) -> pd.DataFrame:
     # Map 'Candidate Name' (with space) to candidate_name
     if 'Candidate Name' in raw.columns:
         mapped_data['candidate_name'] = raw['Candidate Name'].apply(_clean)
-        print("   ✓ Mapped 'Candidate Name' -> candidate_name")
+        print("    Mapped 'Candidate Name' -> candidate_name")
     elif 'candidate_name' in raw.columns:
         mapped_data['candidate_name'] = raw['candidate_name'].apply(_clean)
     else:
@@ -222,13 +222,13 @@ def load_candidate_profiles(source_path: Path) -> pd.DataFrame:
         for col in raw.columns:
             if 'name' in col.lower():
                 mapped_data['candidate_name'] = raw[col].apply(_clean)
-                print(f"   ✓ Mapped '{col}' -> candidate_name")
+                print(f"    Mapped '{col}' -> candidate_name")
                 break
     
     # Map 'Email ID' (with space) to email
     if 'Email ID' in raw.columns:
         mapped_data['email'] = raw['Email ID'].apply(_clean)
-        print("   ✓ Mapped 'Email ID' -> email")
+        print("    Mapped 'Email ID' -> email")
     elif 'email' in raw.columns:
         mapped_data['email'] = raw['email'].apply(_clean)
     else:
@@ -236,13 +236,13 @@ def load_candidate_profiles(source_path: Path) -> pd.DataFrame:
         for col in raw.columns:
             if 'email' in col.lower():
                 mapped_data['email'] = raw[col].apply(_clean)
-                print(f"   ✓ Mapped '{col}' -> email")
+                print(f"    Mapped '{col}' -> email")
                 break
     
     # Map 'Skills' (with multi-line text) to skills
     if 'Skills' in raw.columns:
         mapped_data['skills'] = raw['Skills'].apply(_extract_skills)
-        print("   ✓ Mapped 'Skills' -> skills (multi-line support)")
+        print("    Mapped 'Skills' -> skills (multi-line support)")
     elif 'skills' in raw.columns:
         mapped_data['skills'] = raw['skills'].apply(_extract_skills)
     else:
@@ -250,13 +250,13 @@ def load_candidate_profiles(source_path: Path) -> pd.DataFrame:
         for col in raw.columns:
             if 'skill' in col.lower():
                 mapped_data['skills'] = raw[col].apply(_extract_skills)
-                print(f"   ✓ Mapped '{col}' -> skills (multi-line support)")
+                print(f"   Mapped '{col}' -> skills (multi-line support)")
                 break
     
     # Map 'Notice Period (Days)' (with parentheses) to notice_period_days
     if 'Notice Period (Days)' in raw.columns:
         mapped_data['notice_period_days'] = raw['Notice Period (Days)'].apply(_clean)
-        print("   ✓ Mapped 'Notice Period (Days)' -> notice_period_days")
+        print("    Mapped 'Notice Period (Days)' -> notice_period_days")
     elif 'notice_period_days' in raw.columns:
         mapped_data['notice_period_days'] = raw['notice_period_days'].apply(_clean)
     else:
@@ -264,12 +264,12 @@ def load_candidate_profiles(source_path: Path) -> pd.DataFrame:
         for col in raw.columns:
             if 'notice' in col.lower():
                 mapped_data['notice_period_days'] = raw[col].apply(_clean)
-                print(f"   ✓ Mapped '{col}' -> notice_period_days")
+                print(f"  Mapped '{col}' -> notice_period_days")
                 break
     
     # Create DataFrame from mapped data
     if not mapped_data:
-        print("\n❌ ERROR: No recognizable columns found in Excel file")
+        print("\n ERROR: No recognizable columns found in Excel file")
         print("Please ensure your file has columns like:")
         print("  • Candidate Name")
         print("  • Skills")
@@ -284,7 +284,7 @@ def load_candidate_profiles(source_path: Path) -> pd.DataFrame:
     for column in required:
         if column not in normalized.columns:
             normalized[column] = ""
-            print(f"   ⚠️ Added missing column: {column} (empty)")
+            print(f"   WARNING: Added missing column: {column} (empty)")
     
     # Filter out rows with empty candidate names or skills
     before_count = len(normalized)
@@ -294,14 +294,14 @@ def load_candidate_profiles(source_path: Path) -> pd.DataFrame:
     if before_count != after_count:
         removed = before_count - after_count
         logger.warning(f"Removed {removed} rows with missing candidate names or skills")
-        print(f"⚠️ Removed {removed} row(s) with missing candidate names or skills")
+        print(f" WARNING: Removed {removed} row(s) with missing candidate names or skills")
     
     # Remove duplicates
     normalized = normalized.drop_duplicates(subset=["candidate_name", "email"]).reset_index(drop=True)
     
     # Final validation
     if normalized.empty:
-        print("\n❌ ERROR: No valid candidate profiles found after processing")
+        print("\n ERROR: No valid candidate profiles found after processing")
         print("Please ensure your Excel file contains at least one row with:")
         print("  • Candidate Name (non-empty)")
         print("  • Skills (non-empty)")
@@ -310,7 +310,7 @@ def load_candidate_profiles(source_path: Path) -> pd.DataFrame:
         return pd.DataFrame()
     
     # Print success summary
-    print(f"\n✅ Successfully loaded {len(normalized)} candidate profile(s)")
+    print(f"\n Successfully loaded {len(normalized)} candidate profile(s)")
     print(f"   Columns: {', '.join(normalized.columns.tolist())}")
     
     # Show sample of first candidate (skills truncated)

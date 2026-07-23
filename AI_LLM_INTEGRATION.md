@@ -15,7 +15,7 @@ The hiring pipeline uses AI-powered semantic embeddings for intelligent candidat
 - **Semantic Matching** - Vector-based comparison
 - **Blended Scoring** - Combines semantic + keyword matching
 
----
+--- 
 
 ## AI Models Used
 

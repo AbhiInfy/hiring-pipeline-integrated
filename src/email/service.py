@@ -211,12 +211,12 @@ def filter_jobs_with_matches(matches_df: pd.DataFrame, jd_catalog_df: pd.DataFra
     Returns empty DataFrame if no jobs have matches.
     """
     if matches_df is None or matches_df.empty:
-        print("\n⚠️ No matching candidates found. No jobs qualify for email dispatch.")
+        print("\n No matching candidates found. No jobs qualify for email dispatch.")
         return pd.DataFrame()
     
     # Check if row_num column exists
     if "row_num" not in matches_df.columns:
-        print("\n⚠️ Warning: 'row_num' column not found in matches. Cannot filter jobs.")
+        print("\n Warning: 'row_num' column not found in matches. Cannot filter jobs.")
         print("   Will attempt to send emails for all jobs.")
         return jd_catalog_df
     
@@ -231,18 +231,18 @@ def filter_jobs_with_matches(matches_df: pd.DataFrame, jd_catalog_df: pd.DataFra
     jobs_without_matches = total_jobs - jobs_with_matches
     
     print(f"\n{'='*60}")
-    print("📧 EMAIL DISPATCH FILTER")
+    print(" EMAIL DISPATCH FILTER")
     print(f"{'='*60}")
     print(f"Total jobs in catalog:     {total_jobs}")
     print(f"Jobs with matching candidates: {jobs_with_matches}")
     print(f"Jobs without any matches:  {jobs_without_matches}")
     
     if jobs_without_matches > 0:
-        print(f"\n✅ Will send emails only for {jobs_with_matches} job(s) that have candidates.")
-        print(f"❌ Skipping {jobs_without_matches} job(s) with no matching candidates.")
+        print(f"\n Will send emails only for {jobs_with_matches} job(s) that have candidates.")
+        print(f"ERROR: Skipping {jobs_without_matches} job(s) with no matching candidates.")
     
     if jobs_with_matches == 0:
-        print("\n🚫 NO EMAILS WILL BE SENT - No jobs have matching candidates.")
+        print("\n NO EMAILS WILL BE SENT - No jobs have matching candidates.")
     
     return filtered_jd_catalog
 
@@ -263,7 +263,7 @@ def dispatch_shortlist_emails(
     # Safety check for empty matches
     if matches_df is None or matches_df.empty:
         print("\n" + "="*60)
-        print("❌ EMAIL DISPATCH SKIPPED")
+        print(" EMAIL DISPATCH SKIPPED")
         print("="*60)
         print("Reason: No matches found (empty matches DataFrame).")
         print("This usually means:")
@@ -282,7 +282,7 @@ def dispatch_shortlist_emails(
     # If no jobs have matches, return empty
     if filtered_jd_catalog.empty:
         print("\n" + "="*60)
-        print("❌ EMAIL DISPATCH SKIPPED")
+        print("EMAIL DISPATCH SKIPPED")
         print("="*60)
         print("Reason: No jobs found with matching candidates.")
         print("No emails will be sent.")
@@ -311,7 +311,7 @@ def dispatch_shortlist_emails(
         
         # Skip if no candidates for this job
         if not candidates:
-            print(f"⚠️ Warning: Job '{role}' at {company} (row_num={row_num}) has no candidates. Skipping.")
+            print(f"Warning: Job '{role}' at {company} (row_num={row_num}) has no candidates. Skipping.")
             continue
 
         # Build subject and body (company name is cleaned inside these functions)
@@ -365,20 +365,20 @@ def dispatch_shortlist_emails(
     # Print summary
     if dispatch_rows:
         print(f"\n{'='*60}")
-        print("📧 EMAIL DISPATCH SUMMARY")
+        print(" EMAIL DISPATCH SUMMARY")
         print(f"{'='*60}")
         print(f"Emails dispatched for {len(dispatch_rows)} job(s) with candidates")
         
         if not config.send_emails:
-            print("⚠️ DRY-RUN MODE: No actual emails were sent")
+            print(" DRY-RUN MODE: No actual emails were sent")
             print(f"   Would have sent {len(dispatch_rows)} email(s)")
         elif config.send_emails:
             sent = sum(1 for r in dispatch_rows if r["status"] == "sent")
             failed = sum(1 for r in dispatch_rows if r["status"] == "failed")
-            print(f"✅ Successfully sent: {sent}")
-            print(f"❌ Failed: {failed}")
+            print(f" Successfully sent: {sent}")
+            print(f" Failed: {failed}")
     else:
-        print("\n✅ No emails to dispatch - all jobs lacked matching candidates")
+        print("\n No emails to dispatch - all jobs lacked matching candidates")
 
     dispatch_df = pd.DataFrame(
         dispatch_rows,

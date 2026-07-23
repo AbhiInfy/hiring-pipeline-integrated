@@ -5,8 +5,6 @@ from utils.data_loader import (
     get_output_paths,
     load_csv,
 )
-
-
 def render_jobs_panel():
     """Render the top matching candidates."""
 
@@ -20,29 +18,38 @@ def render_jobs_panel():
         st.info("No shortlisted candidates available.")
         return
 
+    # Sort candidates by Final AI Score
     df = df.sort_values(
-        by="match_score",
+        by="final_score",
         ascending=False,
     )
 
+    # Select columns to display
     display_df = df[
         [
             "candidate_name",
             "role",
             "company",
-            "match_score",
+            "final_score",
+            "semantic_score",
+            "token_score",
         ]
     ].copy()
 
-    display_df["match_score"] = (
-        display_df["match_score"] * 100
-    ).round(2).astype(str) + "%"
+    # Convert scores into percentages
+    for col in ["final_score", "semantic_score", "token_score"]:
+        display_df[col] = (
+            display_df[col] * 100
+        ).round(2).astype(str) + "%"
 
+    # Rename columns
     display_df.columns = [
         "Candidate",
         "Role",
         "Company",
-        "Match Score",
+        "Final Score",
+        "Semantic Score",
+        "Token Score",
     ]
 
     st.dataframe(

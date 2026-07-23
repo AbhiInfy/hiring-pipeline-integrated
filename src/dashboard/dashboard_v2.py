@@ -1,4 +1,7 @@
 import streamlit as st
+import subprocess
+import sys
+from pathlib import Path
 from styles.theme import load_theme
 from components.header import render_header
 from components.search_panel import render_search_panel
@@ -20,6 +23,43 @@ load_theme()
 render_sidebar()
 render_header()
 search_data = render_search_panel()
+
+if search_data["run"]:
+
+    with st.spinner("🚀 Running AI Hiring Pipeline..."):
+
+        command = [
+            sys.executable,
+            "run_integrated_pipeline.py",
+            "--keyword",
+            search_data["keyword"],
+            "--pages",
+            str(search_data["pages"]),
+            "--min-score",
+            str(search_data["min_score"]),
+            "--top-k",
+            "5",
+            "--send-emails",
+            "--notification-email",
+            "mehulnainwal123@email.com",
+            "--use-embeddings",
+            "--cache-embeddings",
+        ]
+
+        result = subprocess.run(
+            command,
+            capture_output=True,
+            text=True,
+            cwd=Path(__file__).resolve().parents[2],
+        )
+
+    if result.returncode == 0:
+        st.success("✅ Pipeline completed successfully!")
+        st.rerun()
+
+    else:
+        st.error("❌ Pipeline failed.")
+        st.code(result.stderr)
 
 st.divider()
 

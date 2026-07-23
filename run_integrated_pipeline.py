@@ -100,9 +100,9 @@ def main() -> int:
             max_emails=args.max_emails
         )
         if new_candidates > 0:
-            print(f"✅ Added {new_candidates} new candidates to database")
+            print(f" Added {new_candidates} new candidates to database")
         else:
-            print("ℹ️ No new candidates found")
+            print(" No new candidates found")
         print()
 
     print("[Stage 1/5] Job Generator (JD Generation)...")
@@ -136,7 +136,7 @@ def main() -> int:
     # Validate candidate data
     if candidate_profiles.empty:
         print("\n" + "="*60)
-        print("❌ PIPELINE STOPPED: No Valid Candidate Data")
+        print("ERROR: PIPELINE STOPPED: No Valid Candidate Data")
         print("="*60)
         print("The candidate profiles file could not be loaded or contains no valid data.")
         print(f"File: {paths.candidate_profiles_file}")
@@ -170,23 +170,23 @@ def main() -> int:
         try:
             # Initialize embeddings service based on choice
             if args.embedding_model == "hybrid":
-                print("🔄 Initializing hybrid embeddings (Groq + Sentence Transformers fallback)...")
+                print(" Initializing hybrid embeddings (Groq + Sentence Transformers fallback)...")
                 embeddings_service = HybridEmbeddingsService(api_key=groq_api_key, cache_dir=cache_dir)
-                print("✅ Hybrid embeddings service initialized")
+                print(" Hybrid embeddings service initialized")
 
             elif args.embedding_model == "groq":
                 if not groq_api_key:
-                    print("⚠️ GROQ_API_KEY not set, using Sentence Transformers instead")
+                    print("WARNING: GROQ_API_KEY not set, using Sentence Transformers instead")
                     embeddings_service = SentenceTransformersEmbeddingsService(cache_dir=cache_dir)
                 else:
-                    print("🔄 Initializing Groq embeddings...")
+                    print(" Initializing Groq embeddings...")
                     embeddings_service = GroqEmbeddingsService(api_key=groq_api_key, cache_dir=cache_dir)
-                    print("✅ Groq embeddings service initialized")
+                    print(" Groq embeddings service initialized")
 
             else:  # sentence-transformers
-                print("🔄 Initializing Sentence Transformers embeddings...")
+                print(" Initializing Sentence Transformers embeddings...")
                 embeddings_service = SentenceTransformersEmbeddingsService(cache_dir=cache_dir)
-                print("✅ Sentence Transformers embeddings service initialized")
+                print(" Sentence Transformers embeddings service initialized")
 
             matcher = SemanticMatcher(
                 embeddings_service=embeddings_service,
@@ -196,10 +196,10 @@ def main() -> int:
 
             matches = matcher.match_candidates_to_jd_semantic(jd_catalog, candidate_profiles)
             matching_mode_used = f"semantic+token ({args.embedding_model}, blend={args.blend_ratio})"
-            print(f"✅ Using semantic matching with {args.embedding_model} embeddings")
+            print(f" Using semantic matching with {args.embedding_model} embeddings")
 
         except Exception as e:
-            print(f"⚠️ Semantic matching failed: {e}")
+            print(f" WARNING: Semantic matching failed: {e}")
             print("Falling back to token-based matching...")
             matches = match_candidates_to_jd(
                 jd_catalog,

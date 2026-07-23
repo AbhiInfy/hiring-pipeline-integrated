@@ -11,10 +11,8 @@ echo 2. Scrape jobs from Naukri
 echo 3. Match candidates to jobs
 echo 4. Send shortlist emails
 echo.
-
 set /p keyword="Enter technology [Oracle Fusion Application]: "
 if "%keyword%"=="" set keyword=Oracle Fusion Application
-
 set /p pages="Enter pages to scan [3]: "
 if "%pages%"=="" set pages=3
 

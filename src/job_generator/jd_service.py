@@ -6,7 +6,6 @@ from urllib.request import Request, urlopen
 
 import pandas as pd
 
-
 def _clean(value: str) -> str:
     value = value or ""
     value = re.sub(r"\s+", " ", str(value)).strip()
