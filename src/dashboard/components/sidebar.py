@@ -21,17 +21,17 @@ def render_sidebar():
         unsafe_allow_html=True,
         )
 
-        st.button("🏠 Dashboard", use_container_width=True)
+        st.button("🏠 Dashboard", use_container_width=True, key="sidebar_dashboard")
 
-        st.button("👥 Candidates", use_container_width=True)
+        st.button("👥 Candidates", use_container_width=True, key="sidebar_candidates")
 
-        st.button("📄 Resume Analysis", use_container_width=True)
+        st.button("📄 Resume Analysis", use_container_width=True, key="sidebar_resume_analysis")
 
-        st.button("🎯 Job Matching", use_container_width=True)
+        st.button("🎯 Job Matching", use_container_width=True, key="sidebar_job_matching")
 
-        st.button("📊 Reports", use_container_width=True)
+        st.button("📊 Reports", use_container_width=True, key="sidebar_reports")
 
-        st.button("⚙️ Settings", use_container_width=True)
+        st.button("⚙️ Settings", use_container_width=True, key="sidebar_settings")
 
         st.divider()
 
@@ -40,11 +40,11 @@ def render_sidebar():
             unsafe_allow_html=True,
         )
 
-        st.button("⬆ Upload Resume", use_container_width=True)
+        st.button("⬆ Upload Resume", use_container_width=True, key="sidebar_upload_resume")
 
-        st.button("➕ Analyze Resume", use_container_width=True)
+        st.button("➕ Analyze Resume", use_container_width=True, key="sidebar_analyze_resume")
 
-        st.button("💼 View Jobs", use_container_width=True)
+        st.button("💼 View Jobs", use_container_width=True, key="sidebar_view_jobs")
 
         st.divider()
 

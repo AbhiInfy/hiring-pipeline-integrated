@@ -78,12 +78,12 @@ def _load_email_template() -> str:
         "I came across the job description for an {role} role and was impressed by the requirements. "
         "At RSI, we specialize in providing tailored solutions for businesses, focusing on process optimization, "
         "cost reduction, and increased efficiency.\n\n"
-        "Our team has extensive experience in implementing and supporting Oracle Fusion Financials, including "
-        "GL/AP/AR, R2R & P2P, and Financial Reporting. We can help you streamline your financial processes, "
-        "ensure seamless data migration, and integrate your ERP systems.\n\n"
-        "Below are three strong candidates we have identified for this role:\n\n"
+        "Our team has strong experience supporting similar technology requirements, including implementation, "
+        "integration, and ongoing application support. We can help you accelerate hiring with pre-vetted "
+        "candidates aligned to this role.\n\n"
+        "Below are strong candidates we have identified for this role:\n\n"
         "{candidate_lines}\n\n"
-        "We would be delighted to discuss how RSI can support your Oracle Fusion Financials needs. "
+        "We would be delighted to discuss how RSI can support this requirement. "
         "Please let us know if you would like to schedule a call to explore further.\n\n"
         "Best regards,\n"
         "{sender_name}\n"
@@ -111,7 +111,7 @@ def _build_candidate_lines(candidates: Iterable[dict]) -> str:
     lines = []
     for candidate in candidate_rows[:3]:
         name = _clean(str(candidate.get("candidate_name", ""))) or "Candidate"
-        skills = _clean(str(candidate.get("skills", ""))) or "Relevant Oracle Fusion skills"
+        skills = _clean(str(candidate.get("skills", ""))) or "Relevant technical skills"
         notice_period = _format_notice_period(str(candidate.get("notice_period_days", "")))
         lines.append(f"- {name} | {skills} | {notice_period}")
 
@@ -120,7 +120,7 @@ def _build_candidate_lines(candidates: Iterable[dict]) -> str:
 
 def _build_body(row_num: int, role: str, company: str, candidates: Iterable[dict]) -> str:
     """Build email body with cleaned company name"""
-    role_text = _clean(role) or "L2 Application Support Oracle Fusion Financials"
+    role_text = _clean(role) or "Open Role"
     company_text = _clean_company_name(company)  # Use cleaned company name
     sender_name = _clean(os.getenv("MAIL_SENDER_NAME", "Abhishek"))
     sender_title = _clean(os.getenv("MAIL_SENDER_TITLE", "Business Development Executive, RSI"))

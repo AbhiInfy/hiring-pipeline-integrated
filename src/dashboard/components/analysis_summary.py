@@ -6,6 +6,11 @@ from utils.data_loader import (
 )
 
 
+def _clamp_progress(value: float) -> float:
+    """Return a safe Streamlit progress value in [0.0, 1.0]."""
+    return max(0.0, min(1.0, value))
+
+
 def render_analysis_summary():
     """Render AI analysis summary."""
 
@@ -70,7 +75,7 @@ def render_analysis_summary():
 
         st.write("### 🎯 Match Rate")
 
-        st.progress(match_rate / 100)
+        st.progress(_clamp_progress(match_rate / 100))
 
         st.caption(
             f"{match_rate:.1f}% ({total_matches} of {total_candidates} candidates matched)"
@@ -84,7 +89,7 @@ def render_analysis_summary():
 
         st.write("### 📧 Email Success")
 
-        st.progress(email_rate / 100)
+        st.progress(_clamp_progress(email_rate / 100))
 
         st.caption(
             f"{email_rate:.1f}% ({emails_sent} sent • {emails_failed} failed)"

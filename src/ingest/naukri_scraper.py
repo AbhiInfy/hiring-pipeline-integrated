@@ -270,10 +270,14 @@ def scrape_job_links(
     delay: float = 2.0,
     login: bool = False,
     skip_contact_details: bool = False,
+    reset_output: bool = False,
 ) -> dict[str, int]:
     output_path = Path(output_path).resolve()
     profile_dir = Path(profile_dir).resolve()
     profile_dir.mkdir(parents=True, exist_ok=True)
+
+    if reset_output and output_path.exists():
+        output_path.unlink()
 
     workbook = ensure_workbook(output_path)
     sheet = workbook[SHEET_NAME]

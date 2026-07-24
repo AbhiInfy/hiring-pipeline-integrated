@@ -35,11 +35,19 @@ def build_parser() -> argparse.ArgumentParser:
                        help="Maximum emails to process (default: 50)")
 
     parser.add_argument("--keyword", default="Oracle Fusion Application")
+    parser.add_argument("--skills", default="")
+    parser.add_argument("--experience", default="")
+    parser.add_argument("--location", default="")
     parser.add_argument("--pages", type=int, default=3)
     parser.add_argument("--max-age-hours", type=int, default=24)
     parser.add_argument("--delay", type=float, default=2.0)
     parser.add_argument("--login", action="store_true")
     parser.add_argument("--skip-contact-details", action="store_true")
+    parser.add_argument(
+        "--reset-job-links",
+        action="store_true",
+        help="Start each run with a fresh job-links workbook",
+    )
 
     parser.add_argument("--rows", type=int, default=None)
     parser.add_argument("--top-k", type=int, default=5)
@@ -106,8 +114,29 @@ def main() -> int:
         print()
 
     print("[Stage 1/5] Job Generator (JD Generation)...")
+    query_parts: list[str] = []
+    for part in [args.keyword, args.skills, args.experience, args.location]:
+        value = str(part).strip()
+        if not value or value.lower() == "any":
+            continue
+        query_parts.append(value)
+
+    search_query = " ".join(query_parts)
+    print("\n" + "=" * 60)
+    print(" SEARCH QUERY")
+    print("=" * 60)
+    print(f" keyword   : {args.keyword!r}")
+    print(f" skills    : {args.skills!r}")
+    print(f" experience: {args.experience!r}")
+    print(f" location  : {args.location!r}")
+    print(f" combined  : {search_query!r}")
+    print(f" pages     : {args.pages}")
+    print(f" min-score : {args.min_score}")
+    print(f" top-k     : {args.top_k}")
+    print("=" * 60 + "\n")
+
     scrape_job_links(
-        keyword=args.keyword,
+        keyword=search_query,
         output_path=output_path,
         profile_dir=paths.profile_dir,
         pages=args.pages,
@@ -115,6 +144,7 @@ def main() -> int:
         delay=args.delay,
         login=args.login,
         skip_contact_details=args.skip_contact_details,
+        reset_output=args.reset_job_links,
     )
 
     # Ensure downstream stages always have a recipient email fallback in the exported job file.
@@ -245,6 +275,11 @@ def main() -> int:
         "used_jd_mode": jd_mode_used,
         "used_matching_mode": matching_mode_used,
         "email_extraction_enabled": args.extract_from_emails,
+        "search_keyword": args.keyword,
+        "search_skills": args.skills,
+        "search_experience": args.experience,
+        "search_location": args.location,
+        "search_query": search_query,
         "warnings": runtime_warnings,
         "job_links_file": str(paths.job_links_file),
         "jd_catalog_file": str(paths.jd_catalog_file),
@@ -254,6 +289,18 @@ def main() -> int:
     }
     paths.summary_file.write_text(json.dumps(summary, indent=2), encoding="utf-8")
 
+    print("\n" + "=" * 60)
+    print(" PIPELINE RESULT")
+    print("=" * 60)
+    print(f" search_query     : {search_query!r}")
+    print(f" total_jobs       : {summary['total_jobs']}")
+    print(f" total_candidates : {summary['total_candidates']}")
+    print(f" total_matches    : {summary['total_matches']}")
+    print(f" emails_sent      : {summary['emails_sent']}")
+    print(f" emails_failed    : {summary['emails_failed']}")
+    print(f" matching_mode    : {summary['used_matching_mode']}")
+    print(f" jd_mode          : {summary['used_jd_mode']}")
+    print("=" * 60)
     print("Integrated architecture pipeline completed successfully.")
     print(f"Job links: {paths.job_links_file}")
     print(f"JD catalog: {paths.jd_catalog_file}")

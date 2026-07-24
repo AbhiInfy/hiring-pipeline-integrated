@@ -2,13 +2,13 @@ Dear Hiring Manager,
 
 I came across the job description for an {role} role and was impressed by the requirements. At RSI, we specialize in providing tailored solutions for businesses, focusing on process optimization, cost reduction, and increased efficiency.
 
-Our team has extensive experience in implementing and supporting Oracle Fusion Financials, including GL/AP/AR, R2R & P2P, and Financial Reporting. We can help you streamline your financial processes, ensure seamless data migration, and integrate your ERP systems.
+Our team has strong experience supporting similar technology requirements, including implementation, integration, and ongoing application support. We can help you accelerate hiring with pre-vetted candidates aligned to this role.
 
-Below are three strong candidates we have identified for this role:
+Below are strong candidates we have identified for this role:
 
 {candidate_lines}
 
-We would be delighted to discuss how RSI can support your Oracle Fusion Financials needs. Please let us know if you would like to schedule a call to explore further.
+We would be delighted to discuss how RSI can support this requirement. Please let us know if you would like to schedule a call to explore further.
 
 Best regards,
 {sender_name}
