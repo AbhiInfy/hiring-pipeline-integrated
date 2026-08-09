@@ -11,7 +11,7 @@ from components.upload_panel import render_upload_panel
 from components.pipeline_overview import render_pipeline_overview
 from components.analysis_summary import render_analysis_summary
 from components.jobs_panel import render_jobs_panel
-
+from components.recommended_jobs_panel import render_recommended_jobs_panel
 
 def _log(message: str = "") -> None:
     """Print to the Streamlit / terminal console with flush."""
@@ -177,7 +177,93 @@ st.divider()
 upload_col, overview_col = st.columns([1.2,1])
 
 with upload_col:
-    uploaded_file = render_upload_panel()
+    candidate_data = render_upload_panel()
+
+    # ==========================================================
+# Candidate Resume → Find Matching Jobs
+# ==========================================================
+
+if (
+    candidate_data
+    and candidate_data["find_jobs"]
+):
+
+    candidate_info = candidate_data["candidate_information"]
+
+    role = candidate_info.get("role", "")
+    if not role:
+        st.error("No job role could be extracted from the uploaded resume.")
+        st.stop()
+    skills = ", ".join(candidate_info.get("skills", []))
+    if isinstance(skills, list):
+        skills = ", ".join(skills)
+    experience = candidate_info.get("experience", "")
+    location = candidate_info.get("location", "")
+
+    st.info(
+        f"""
+    ### Searching Matching Jobs
+
+    **Role:** {role}
+
+    **Skills:** {skills if skills else "Not specified"}
+
+    **Experience:** {experience if experience else "Not specified"}
+
+    **Location:** {location if location else "Not specified"}
+    """
+    )
+
+    command = [
+        sys.executable,
+        "run_integrated_pipeline.py",
+
+        "--keyword",
+        role,
+
+        "--skills",
+        skills,
+
+        "--experience",
+        experience,
+
+        "--location",
+        location,
+
+        "--pages",
+        str(search_data["pages"]),
+
+        "--top-k",
+         str(search_data["top_k"]),
+
+        "--min-score",
+        str(search_data["min_score"]),
+
+        "--reset-job-links",
+
+        "--send-emails",
+
+        "--notification-email",
+        "chaturvedi.abhishek10@gmail.com",
+
+        "--use-embeddings",
+
+        "--cache-embeddings",
+    ]
+
+    with st.spinner("Finding matching jobs..."):
+        result = _run_pipeline_streaming(
+            command,
+            cwd=Path(__file__).resolve().parents[2],
+        )
+
+    if result.returncode == 0:
+        st.session_state["show_recommended_jobs"] = True
+
+        st.success("✅ Matching jobs found successfully!")
+        st.rerun()
+    else:
+        st.error("❌ Failed to find matching jobs.")
 
 with overview_col:
     render_pipeline_overview()
@@ -197,3 +283,6 @@ with summary_col:
 
 with jobs_col:
     render_jobs_panel()
+    if st.session_state.get("show_recommended_jobs", False):
+        st.write("")
+        render_recommended_jobs_panel()
